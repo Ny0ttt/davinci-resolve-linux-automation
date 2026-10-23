@@ -1,0 +1,58 @@
+{
+  "profile_name": "example_tutorial",
+  "content_type": "tutorial/explainer talking -- calm, measured delivery, not high-energy commentary",
+  "description": "Caption timing derived from a manual timing edit of a tutorial-style clip. The clip and the 30-cue reference SRT these numbers were measured against are not in this repo -- they are third-party footage and were not ours to publish -- so treat this as a recorded starting point, not a fixture you can re-verify here. Measure your own before changing the numbers.",
+
+  "transcription": {
+    "_warning": "This block is DOCUMENTATION ONLY -- nothing in the pipeline reads it. The flags that actually run live in the streamer profile's `whisper` block (streamers/example.json). Kept here to record what produced the validated output.",
+    "model": "medium",
+    "language": "auto",
+    "dtw": "medium",
+    "vad": true,
+    "vad_model": "whisper.cpp/models/ggml-silero-v5.1.2.bin",
+    "vad_threshold": 0.5,
+    "vad_speech_pad_ms": 30,
+    "vad_min_silence_duration_ms": 100
+  },
+
+  "line_grouping": {
+    "pause_threshold_ms": 100,
+    "max_chars": 28,
+    "max_words": 6,
+    "break_on_sentence_punctuation": true,
+    "_note": "A new caption line starts on a pause longer than pause_threshold_ms, on sentence punctuation, or when max_chars/max_words is reached. On most content max_chars and punctuation are what actually break lines -- the pause threshold rarely fires. Check before tuning it."
+  },
+
+  "repeated_word_handling": {
+    "merge_gap_ms": 400,
+    "note": "Consecutive identical words within this gap merge into one cue -- whisper's per-word timestamps are unreliable on rapid repeats."
+  },
+
+  "duration_ceiling": {
+    "per_word_seconds": 0.35,
+    "base_seconds": 0.3,
+    "note": "Caps a cue's length by word count so captions don't linger: cap = start + n_words*per_word_seconds + base_seconds. Applied unconditionally here. CAUTION: an aggressive ceiling is the single most common cause of bad captions -- on faster content this one truncated cues badly and left holes. If your captions cover far less than the clip, suspect this first. Set both to a large number (e.g. 99.0) to disable."
+  },
+
+  "timing_bias_correction": {
+    "start_shift_ms": -240,
+    "end_shift_ms": -380,
+    "measured_from": "a manual reference edit of the same clip, ~96 words matched",
+    "note": "Whisper's timestamps ran systematically late on this content; these are the measured median offsets, applied to finished line boundaries only (not before grouping, which would distort gap detection). DO NOT copy these numbers to other content -- an unmeasured shift compresses every cue. Leave both at 0 until you have measured your own against a hand-corrected reference."
+  },
+
+  "post_processing": {
+    "overlap_clamp": true,
+    "note": "No line's end may exceed the next line's start.",
+    "spread_collapsed": false,
+    "_spread_collapsed_note": "OFF here on purpose: this profile's output, zero-length cues included, is what was measured against the manual reference edit. Turning it on changes several of those cues. See example_gameplay.json for what it does and why you probably want it on for real work."
+  },
+
+  "validated_against": "A manual reference edit of one tutorial-style clip -- 30 cues, ~96 words matched. Neither the clip nor the reference SRT ships with this repo (see `description`), so there is no self-test to run: validate against your own footage.",
+
+  "known_limitations": [
+    "Rapid repeated-word stretches may merge into one longer cue rather than matching manually-split rhythm.",
+    "No silence gating -- see example_gameplay.json and docs/constraints.md.",
+    "Tuned for calm explainer delivery. Using it on fast commentary truncates cues; use a profile measured on that content instead."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "profile_name": "example_gameplay",
+  "content_type": "live gameplay commentary -- high-energy delivery, frequent mid-sentence pauses, code-switched speech",
+  "description": "A starting point for fast commentary. Differs from example_tutorial in two deliberate ways: the duration ceiling is DISABLED, and the timing bias is ZERO. Both were wrong when inherited from a calmer profile. Read the notes before changing anything.",
+
+  "transcription": {
+    "_warning": "DOCUMENTATION ONLY -- nothing reads this block. The real flags live in the streamer profile's `whisper` block.",
+    "language": "set this explicitly -- whisper.cpp defaults to 'en' and will TRANSLATE other languages rather than transcribe them",
+    "word_timestamps": "-ml 1 -sow",
+    "_word_timestamps_note": "Required: make_captions.py reads transcript['transcription'] as whisper's SEGMENT list, and it only yields one word per entry because these flags force one word per segment.",
+    "model": "medium",
+    "dtw": "medium -- strongly recommended; feeds the align stage",
+    "vad": "silero -- strongly recommended; see align in the streamer profile"
+  },
+
+  "line_grouping": {
+    "pause_threshold_ms": 100,
+    "max_chars": 28,
+    "max_words": 6,
+    "break_on_sentence_punctuation": true,
+    "_note": "A low pause threshold can produce short orphan cues (a single trailing word on its own line). Raising it to ~300 ms barely changed output on the content this was measured on, because punctuation and max_chars dominate. Measure before tuning."
+  },
+
+  "repeated_word_handling": {
+    "merge_gap_ms": 400,
+    "note": "Consecutive identical words within this gap merge into one cue."
+  },
+
+  "duration_ceiling": {
+    "per_word_seconds": 99.0,
+    "base_seconds": 99.0,
+    "_note": "DISABLED BY SENTINEL -- 99.0 means the cap is never reached. This is deliberate. A per-word ceiling carried over from calmer content was the dominant defect on fast commentary: it truncated 13 of 84 cues and left captions covering only 105 s of a 180 s clip with 13 holes over a second. Disabling it restored 179 s of coverage and removed every hole. The correct long-term fix is a per-word plausibility clamp, not a blanket ceiling."
+  },
+
+  "timing_bias_correction": {
+    "start_shift_ms": 0,
+    "end_shift_ms": 0,
+    "_note": "ZEROED DELIBERATELY, which is NOT the same as measured-as-zero. These are whisper's raw timestamps. Carrying a measured shift over from different content compressed every cue and pushed the shortest to 0.11 s. Getting a real number requires a hand-corrected SRT for one stretch of your own footage. Until you have that, leave these at zero."
+  },
+
+  "post_processing": {
+    "overlap_clamp": true,
+    "note": "No line's end may exceed the next line's start.",
+    "spread_collapsed": true,
+    "_spread_collapsed_note": "ON here. When whisper stamps several words with one identical timestamp, the resulting cue would collapse to start == end and never appear on screen. With this on, those lines share the available span proportionally by text length instead. Leave it on unless you are reproducing a fixture."
+  },
+
+  "known_limitations": [
+    "NO SILENCE GATING at the caption stage -- the main open defect. Whisper stretches a word's timestamp across adjacent silence (a two-syllable word can span 1.9 s), so with the ceiling disabled captions tile the whole timeline and linger through silence. The align stage (DTW + Silero VAD, see streamers/example.json) mitigates this upstream and is the reason this profile is usable at all; run it. No parameter in THIS file can fix it.",
+    "Timing bias is unmeasured -- see timing_bias_correction.",
+    "Rapid repeated-word stretches may merge into one longer cue rather than matching manually-split rhythm.",
+    "Short orphan cues can appear at low pause thresholds."
+  ],
+
+  "_status": "STARTING POINT, not a validated profile. Measured by eye on a timeline rather than diffed against a manual reference edit. Treat the numbers as defaults to measure against your own footage, not as correct values."
+}

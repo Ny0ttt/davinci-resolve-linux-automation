@@ -1,0 +1,38 @@
+# Pipeline output -- every run writes here. Never committed.
+projects/
+
+# Local tool paths (copy tools.example.json -> tools.json and edit)
+tools.json
+
+# Your own configs stay local; only the example_* files ship.
+streamers/*.json
+!streamers/example.json
+games/*.json
+!games/example.json
+profiles/*.json
+!profiles/example_tutorial.json
+!profiles/example_gameplay.json
+
+# Your icon packs stay local
+icons/*
+!icons/README.md
+
+# Planning docs are working notes, not part of the project
+plan/
+
+# whisper.cpp is installed and built by the user, not vendored here. It was a git
+# submodule until 2026-10-23; the link to github.com/ggerganov/whisper.cpp was removed so
+# this repo's history depends on nothing outside it. Tested against v1.9.5 (d1be6fd).
+whisper.cpp/
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

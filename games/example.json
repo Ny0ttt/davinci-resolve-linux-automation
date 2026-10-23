@@ -1,0 +1,9 @@
+{
+  "_comment": "GAME PACK -- an example. Copy to games/<game>.json and edit. A pack describes WHAT THE GAME IS, so it can be shared between streamers: an optional icon map, and the Twitch categories it matches. Selected automatically when the VOD's Twitch category matches twitch_games, or forced with --game.",
+  "name": "example",
+  "title": "Example Game",
+  "twitch_games": ["Example Game 2026"],
+  "_twitch_games_note": "Exact Twitch category names. Used to auto-pick this pack from VOD metadata.",
+  "icon_map": null,
+  "_icon_map_note": "Path to an icons/<game>/map.json, or null to skip the icons stage with a notice. See icons/README.md for the format."
+}

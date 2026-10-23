@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{CSRF_TOKEN}}">
+<title>Video Pipeline</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a href="#/" class="brand">Video Pipeline</a>
+  <nav><a href="#/">Runs</a> <a href="#/new">New run</a> <a href="#/streamers">Streamers</a></nav>
+</header>
+<main id="app" tabindex="-1"><p class="muted">Loading…</p></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

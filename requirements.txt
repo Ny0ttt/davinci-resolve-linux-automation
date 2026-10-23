@@ -1,0 +1,4 @@
+# What the pipeline imports directly. Exact versions of everything (incl. transitive)
+# are pinned in requirements.lock -- install from that:  venv/bin/pip install -r requirements.lock
+librosa
+OpenTimelineIO

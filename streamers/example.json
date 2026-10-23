@@ -1,0 +1,67 @@
+{
+  "_comment": "STREAMER PROFILE -- an example. Copy to streamers/<yourname>.json and edit. A profile describes HOW ONE PERSON SOUNDS AND LOOKS: whisper flags, word alignment, caption style, webcam position, layouts. Game knowledge (icon maps, Twitch categories) lives in games/ instead. A run = streamer x game pack. run_pipeline.py reads every field here.",
+  "name": "example",
+  "title": "Example Streamer",
+  "twitch_logins": ["example"],
+  "_twitch_logins_note": "Lets `new --vod <twitch url>` pick this profile automatically. List as many as you like. Omit or leave empty if you only ever use --clip on local files.",
+
+  "whisper": {
+    "model": "whisper.cpp/models/ggml-medium.bin",
+    "language": "en",
+    "args": ["-ml", "1", "-sow", "-nfa", "--dtw", "medium", "-ojf"],
+    "_language_note": "ALWAYS set this explicitly. whisper.cpp's -l defaults to 'en', NOT auto-detect -- leaving it off on non-English speech makes whisper silently TRANSLATE to English instead of transcribing. Use the ISO code of the spoken language ('ms' Malay, 'id' Indonesian, 'es' Spanish...). Code-switched English words still come through as English.",
+    "_args_note": "-ml 1 -sow => one word per transcript entry, which make_captions.py and apply_edits.py both require. --dtw <preset> gives per-word timing for the align stage and the preset MUST match the model. DTW is silently disabled when flash attention is on, hence -nfa. -ojf keeps per-token t_dtw in the JSON."
+  },
+
+  "align": {
+    "vad_model": "whisper.cpp/models/ggml-silero-v5.1.2.bin",
+    "min_silence_ms": 200,
+    "pad_ms": 150,
+    "min_word_ms": 120,
+    "_note": "align stage (align_words.py): a word's START comes from DTW, its END is trimmed back to where speech actually stops (Silero VAD). Without this, whisper attributes trailing silence to the last word and captions tile the whole timeline. Raise min_silence_ms if words get clipped; lower it if captions still linger."
+  },
+
+  "caption_profile": "profiles/example_gameplay.json",
+
+  "scorer": {},
+  "_scorer_note": "Empty = score_cutlist.py defaults. See docs/constraints.md.",
+
+  "media": {
+    "ffmpeg_args": ["-c:v", "mpeg4", "-q:v", "3", "-g", "30", "-pix_fmt", "yuv420p",
+                    "-c:a", "pcm_s16le", "-ar", "48000"],
+    "_note": "Makes a Resolve-readable copy of the source. These settings exist because the FREE edition of DaVinci Resolve on Linux cannot decode h264 or AAC at all. MPEG-4 Part 2 q3 + PCM imports fine and costs ~4.8 GB/h. If you run Resolve Studio, you can drop this and use the source directly. See docs/constraints.md."
+  },
+
+  "webcam": {
+    "box": [1480, 790, 440, 290],
+    "of": [1920, 1080],
+    "width": 1080,
+    "_note": "Where the webcam sits in the source frame: [x, y, width, height] in pixels of a frame of size `of`, scaled automatically to the real source resolution. `width` is the output width when the webcam is cut out for a vertical layout. Use the UI's Streamers page to drag this box on a real frame instead of guessing."
+  },
+
+  "layouts": {
+    "_note": "One FCPXML per enabled layout. Positions and zoom are in DaVinci Resolve INSPECTOR units -- the numbers you read and tweak in Resolve itself. make_fcpxml.py converts them (FCPXML percent = px / timeline height * 100; scale = zoom).",
+    "normal": {
+      "title": "Normal 16:9",
+      "kind": "full"
+    },
+    "short": {
+      "title": "Vertical Short (webcam top)",
+      "kind": "stack",
+      "size": [1080, 1920],
+      "webcam":   {"track": 1, "zoom": 0.99, "x": 0.0, "y": 1654.0},
+      "gameplay": {"track": 2, "zoom": 2.31, "x": 0.0, "y": -828.569},
+      "captions": {
+        "font": "Helvetica",
+        "size": 60,
+        "face": "Bold",
+        "color": [1, 1, 1, 1],
+        "position": [0, -400],
+        "min_s": 0.2,
+        "_note": "Text titles on V3. Tune one title by hand in Resolve, then read the values back with resolve_read.py."
+      }
+    }
+  },
+
+  "default_layouts": ["normal"]
+}

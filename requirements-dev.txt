@@ -1,0 +1,5 @@
+# Dev-only. The pipeline itself never needs these -- install them when you want to run
+# the smoke suite (`make test`). Kept out of requirements.lock so a user installing the
+# pipeline does not pull a test runner.
+-r requirements.lock
+pytest==8.4.2

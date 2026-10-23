@@ -1,0 +1,15 @@
+# systemd USER service for the Video Pipeline UI (installed by `make install-service`).
+# KillMode=process: stopping/restarting the UI kills only the server, never a running
+# src/run_pipeline.py (runs are their own sessions; disk is the source of truth).
+[Unit]
+Description=Video Pipeline UI (http://127.0.0.1:8765)
+
+[Service]
+WorkingDirectory=@ROOT@
+ExecStart=@ROOT@/venv/bin/python @ROOT@/src/ui_server.py --port 8765
+Environment=VP_UI_QUIET=1
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,9 @@
+{
+  "_comment": "Where the external tools live. Copy to tools.json and edit. Relative paths are from the repo root; bare names are looked up on PATH. Override the whole file with VP_TOOLS=/path/to/tools.json.",
+  "twitch_downloader": "/path/to/TwitchDownloaderCLI",
+  "_twitch_downloader_note": "Only needed for the download stage. Get it from https://github.com/lay295/TwitchDownloader/releases -- do not commit the binary. If you already have your footage on disk, use --clip and this is unused.",
+  "ffmpeg": "ffmpeg",
+  "ffprobe": "ffprobe",
+  "whisper_cli": "whisper.cpp/build/bin/whisper-cli",
+  "whisper_vad": "whisper.cpp/build/bin/whisper-vad-speech-segments"
+}

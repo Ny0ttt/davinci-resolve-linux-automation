@@ -1,0 +1,84 @@
+# What this can and cannot check.
+#
+# A GitHub runner has no GPU, no whisper.cpp build, no 1.5 GB model and no video, so it
+# cannot run the pipeline. It checks that the repo is internally consistent and startable:
+# imports, CLIs, preflight, shipped configs, docs-vs-code, the no-paid-dependency claim,
+# and that no private data got committed.
+#
+# Whether captions are accurate and whether a timeline is correct in DaVinci Resolve stays
+# a human job. A green check here does not mean the output is good.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke tests (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      # whisper.cpp is only needed at run time, and skipping it keeps the checkout small.
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install
+        run: |
+          python -m venv venv
+          venv/bin/pip install --upgrade pip
+          venv/bin/pip install -r requirements-dev.txt
+
+      - name: make check
+        run: make check
+
+  python-floor:
+    # The README promises a minimum Python version. This proves it instead of trusting it:
+    # the lock must install on the stated floor and must NOT install below it. Regression --
+    # the README said 3.10+ while librosa/numpy/scipy pins needed 3.12, so the first install
+    # command failed on Ubuntu 22.04 and Debian 12.
+    name: lock resolves on ${{ matrix.python }} (expect ${{ matrix.expect }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.11"
+            expect: fail
+          - python: "3.12"
+            expect: pass
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Resolve requirements.lock
+        run: |
+          set +e
+          python -m pip install --dry-run --only-binary=:all: \
+            --target /tmp/floor -r requirements.lock
+          got=$?
+          set -e
+          if [ "${{ matrix.expect }}" = "pass" ] && [ $got -ne 0 ]; then
+            echo "::error::requirements.lock does not install on Python ${{ matrix.python }}, which the README states as supported"
+            exit 1
+          fi
+          if [ "${{ matrix.expect }}" = "fail" ] && [ $got -eq 0 ]; then
+            echo "::error::requirements.lock now installs on Python ${{ matrix.python }} -- the README's floor is stricter than it needs to be; lower it"
+            exit 1
+          fi
+          echo "Python ${{ matrix.python }}: resolved=$([ $got -eq 0 ] && echo yes || echo no), as expected"
