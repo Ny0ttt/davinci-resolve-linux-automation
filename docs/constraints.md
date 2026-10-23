@@ -59,6 +59,18 @@ Also confirmed along the way:
 **Consequence:** animated captions cannot go through FCPXML. They go through `.drt`
 instead — see [design-notes.md](design-notes.md#animated-captions-via-drt).
 
+### A .drt is only as general as the template it was exported from
+
+`.drt` is undocumented, so every timeline `make_drt.py` writes is built from a real Resolve
+export in `templates/drt/`. That makes the surrounding structure known-good, and it also means
+the template's **frame rate comes along with it**. The shipped templates are 60 fps, so 60 fps
+is what the writer accepts; it refuses other rates rather than writing a file Resolve might
+read wrong. The orchestrator checks first and skips the stage with a message.
+
+The rate itself is plain text in the sequence XML — a hex-encoded little-endian double,
+`struct.pack("<d", 60.0).hex() == "0000000000004e40"` — so rewriting it is mechanical. Whether
+Resolve accepts a rate its own export did not carry is **untested**.
+
 ### OTIO cannot express layout or subtitles
 
 OpenTimelineIO has no subtitle track type, and no frame size, crop or transform that

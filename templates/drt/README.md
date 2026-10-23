@@ -3,6 +3,12 @@
 The author's own Resolve exports; `make_drt.py` builds every timeline from these (see docs/design-notes.md).
 Never edit by hand -- re-export from Resolve and replace.
 
+**These are 60 fps timelines, and the frame rate comes along with the template.** `make_drt.py`
+refuses other rates and the orchestrator's `drt` stage skips them, pointing at the FCPXML instead.
+To use `.drt` at another rate, replace these with your own exports: build a timeline in Resolve
+21.1.1 at your frame rate with the same track layout and one Text title, then
+Timelines -> Export -> DaVinci Resolve Timeline (.drt). Keep the filenames.
+
 | file | from | used for |
 |---|---|---|
 | normal_21.1.1.drt | run2 Normal timeline + one Text title (Open Sans Semibold 60, Y -0.3037), 2026-10-15 | Normal layout: tracks, media pool, caption style |

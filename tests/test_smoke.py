@@ -18,6 +18,11 @@ Each test below corresponds to a defect that actually shipped:
                                           ROOT/run_pipeline.py, so every UI run died
   - the quickstart's own sample        -- dropping the whisper.cpp submodule would have
                                           taken the quickstart's clip with it
+  - the drt stage was never ported     -- the writer, its templates and its byte formats
+                                          shipped from the start, but no option or stage
+                                          called them, so .drt was unreachable from a run
+  - drt_skip with no fps recorded      -- the guard reads stages.media.fps, so the media
+                                          stage has to write it or the guard never fires
 """
 
 import importlib
@@ -236,13 +241,15 @@ def test_readme_stage_table_matches_the_code():
     assert documented == defined, "README stage table vs STAGES:\n  only in README: %s\n  only in code: %s" % (
         sorted(documented - defined), sorted(defined - documented))
 
-    # and no row may promise an artifact no module produces
+    # and no row may promise an artifact no module produces. This guard sat dormant from the
+    # day it was written -- the README had no .drt row, so the branch never ran and never
+    # showed that its paths were missing the src/ prefix. Adding the drt stage on 2026-10-23
+    # is what finally executed it.
     outputs = " ".join(out for _, _, out in rows)
-    for ext in re.findall(r"`?\.?(\w+)`?\.(drt|fcpxml|otio|srt|json|mov|mp4|wav)\b", outputs):
-        pass
     if ".drt" in outputs:
-        assert any(".drt" in read(m + ".py") and "make_drt" in read("run_pipeline.py")
-                   for m in MODULES), "README lists a .drt output but nothing writes one"
+        assert any(".drt" in read("src/%s.py" % m) for m in MODULES) \
+            and "make_drt" in read("src/run_pipeline.py"), \
+            "README lists a .drt output but nothing writes one"
 
 
 def test_doc_anchors_resolve():
@@ -317,3 +324,124 @@ def test_readme_python_floor_matches_the_lock():
     floor = re.search(r"\*\*Python\*\*\s*\|\s*(\d+)\.(\d+)", read("README.md"))
     assert floor, "README Requirements table has no Python row"
     assert (int(floor.group(1)), int(floor.group(2))) >= (3, 12)
+
+
+# ---------------------------------------------------------------- the .drt stage
+#
+# Ported from the lab repo on 2026-10-23 (plan/drt-in-orchestrator.md). The writer,
+# drt_format.py and templates/drt/ were here all along; only the wiring was missing.
+
+def test_drt_is_a_wired_timeline_option():
+    """Regression: make_drt.py shipped but no option or stage ever called it."""
+    import run_pipeline as rp
+
+    assert "drt" in rp.OPTIONS, "no drt option"
+    assert rp.OPTIONS["drt"]["group"] == "timeline"
+    assert "drt" in {s["name"] for s in rp.STAGES}, "no drt stage"
+    stage = rp.STAGE["drt"]
+    assert stage["inputs"]["words"] == ("review", "transcript"), \
+        "the .drt captions come from the reviewed, aligned transcript"
+
+
+def test_default_options_are_spelled_out():
+    """DEFAULT_OPTIONS was list(OPTIONS), so adding an option silently turned it on for
+    every existing project. Keep it explicit, and keep it a real set of options."""
+    import run_pipeline as rp
+
+    assert "DEFAULT_OPTIONS = [" in read("src/run_pipeline.py"), \
+        "DEFAULT_OPTIONS must be spelled out, not derived from OPTIONS"
+    unknown = set(rp.DEFAULT_OPTIONS) - set(rp.OPTIONS)
+    assert not unknown, "DEFAULT_OPTIONS names options that do not exist: %s" % sorted(unknown)
+    missing = set(rp.OPTIONS) - set(rp.DEFAULT_OPTIONS)
+    assert not missing, ("option %s is in OPTIONS but not DEFAULT_OPTIONS -- intentional? "
+                         "say so here, do not just add it" % sorted(missing))
+
+
+def test_drt_skips_instead_of_failing_on_other_frame_rates():
+    """The templates are 60 fps Resolve exports, so the quickstart's 30 fps sample cannot
+    make a .drt. It must SKIP with a readable reason, not fail the run: make_drt.py's own
+    refusal would abort the stage."""
+    import run_pipeline as rp
+
+    class C:
+        def __init__(self, options, fps):
+            self.options = options
+            self.m = {"stages": {"media": {"fps": fps} if fps else {}}}
+
+    assert rp.drt_skip(C(["drt"], 60.0)) is None, "60 fps media must run the stage"
+
+    msg = rp.drt_skip(C(["drt"], 30.0))
+    assert msg and "30 fps" in msg and "60 fps" in msg, \
+        "the skip must name both rates, not just say no: %r" % msg
+    assert "FCPXML" in msg, "the skip must point at the format that does work"
+
+    assert rp.drt_skip(C(["fcpxml"], 60.0)), "unticked drt must skip"
+    # Projects made before the media stage recorded fps: no guard, let make_drt decide.
+    assert rp.drt_skip(C(["drt"], None)) is None
+
+
+def test_media_stage_records_the_fps_drt_skip_reads():
+    """drt_skip runs on every UI refresh and must not shell out to ffprobe, so it reads
+    stages.media.fps. If the media stage stops writing it the guard silently never fires."""
+    import run_pipeline as rp
+
+    assert rp.STAGE["media"].get("after") is rp.after_media, \
+        "the media stage must run after_media, which records fps"
+    assert 'rec["fps"]' in read("src/run_pipeline.py")
+    assert 'c.m["stages"].get("media", {}).get("fps")' in read("src/run_pipeline.py"), \
+        "drt_skip must read the fps the media stage recorded"
+
+
+def test_a_stacked_layout_accepts_drt_as_well_as_fcpxml():
+    """OTIO cannot draw a Short. Both formats that can must satisfy the check."""
+    import run_pipeline as rp
+
+    st = {"layouts": {"normal": {"title": "Normal 16:9", "kind": "full"},
+                      "short": {"title": "Short", "kind": "stack"}},
+          "webcam": {"x": 0, "y": 0, "w": 10, "h": 10}}
+    assert not rp.option_problems(st, ["short"], ["drt"]), "drt alone must satisfy a Short"
+    assert not rp.option_problems(st, ["short"], ["fcpxml"])
+    assert rp.option_problems(st, ["short"], ["otio"]), "OTIO alone must not"
+
+
+def test_drt_outputs_follow_the_ticked_layouts():
+    import run_pipeline as rp
+
+    assert rp.drt_outputs({"options": ["drt"], "layouts": ["normal", "short"]}) == {
+        "normal": "timeline_normal_v{v}.drt", "short": "timeline_short_v{v}.drt"}
+    assert rp.drt_outputs({"options": ["fcpxml"], "layouts": ["normal"]}) == {}, \
+        "unticked drt must produce no outputs at all"
+
+
+def test_drt_templates_the_code_names_all_ship():
+    """make_drt.py builds every timeline from these; a rename would break at run time."""
+    import make_drt
+
+    for name in make_drt.TEMPLATE.values():
+        assert os.path.exists(os.path.join(rp_templates(), name)), "missing template %s" % name
+    assert make_drt.TEMPLATE_FPS == 60.0
+
+
+def rp_templates():
+    import run_pipeline as rp
+    return rp.DRT_TEMPLATES
+
+
+def test_a_finished_drt_is_offered_as_a_deliverable():
+    """The stage wrote the file but deliverables() did not list it, so neither the CLI
+    summary nor the UI ever showed it."""
+    import run_pipeline as rp
+
+    m = {"layouts": ["normal"], "options": ["drt", "fcpxml", "srt"],
+         "stages": {"timeline": {"outputs": {"normal": "timeline_normal_v1.fcpxml"}},
+                    "drt": {"status": "done", "outputs": {"normal": "timeline_normal_v1.drt"}},
+                    "review": {"outputs": {"captions": "captions_final_v1.srt"}},
+                    "media": {"outputs": {"media": "clip_edit_v1.mov"}}}}
+    roles = [r for r, _, _ in rp.deliverables(m)]
+    assert "drt_normal" in roles, "a finished .drt must be offered: %s" % roles
+    assert roles.index("drt_normal") < roles.index("normal"), \
+        "the animated timeline is the main deliverable when it exists"
+
+    m["stages"]["drt"] = {"status": "skipped"}
+    assert "drt_normal" not in [r for r, _, _ in rp.deliverables(m)], \
+        "a skipped .drt must not be offered"

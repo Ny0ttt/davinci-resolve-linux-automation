@@ -251,6 +251,9 @@ def layout_problems(st, names):
 
 # What a run makes besides the always-on steps (docs/design-notes.md#orchestrator-guarantees). Order = how the UI lists them.
 OPTIONS = {
+    "drt": {"title": "Animated captions (.drt)", "group": "timeline",
+            "help": "Resolve's own timeline file per layout, captions as word chunks that pop in "
+                    "(File → Import → Timeline); 60 fps media only, no icons yet"},
     "fcpxml": {"title": "FCPXML timelines", "group": "timeline",
                "help": "one Resolve timeline per layout (File → Import → Timeline)"},
     "otio": {"title": "OTIO backup timeline", "group": "timeline",
@@ -260,7 +263,9 @@ OPTIONS = {
     "icons": {"title": "Icons on trigger words", "group": "addon",
               "help": "only works when the game pack has an icon map"},
 }
-DEFAULT_OPTIONS = list(OPTIONS)      # no "options" in a project/profile = everything on (as before)
+# No "options" in a project/profile = this list. Spelled out rather than list(OPTIONS) so that
+# adding an option is a deliberate choice about existing projects, not an automatic one.
+DEFAULT_OPTIONS = ["drt", "fcpxml", "otio", "srt", "icons"]
 
 
 def project_options(m):
@@ -272,9 +277,9 @@ def option_problems(st, layouts, names):
     if not any(OPTIONS.get(n, {}).get("group") == "timeline" for n in names):
         out.append("tick at least one timeline file (%s)" % ", ".join(
             OPTIONS[n]["title"] for n in OPTIONS if OPTIONS[n]["group"] == "timeline"))
-    elif st and "fcpxml" not in names and any(profile_layouts(st).get(n, {}).get("kind") == "stack"
-                                             for n in layouts):
-        out.append("the Short layout needs FCPXML timelines (OTIO can't draw it)")
+    elif st and not {"fcpxml", "drt"} & set(names) and any(
+            profile_layouts(st).get(n, {}).get("kind") == "stack" for n in layouts):
+        out.append("the Short layout needs FCPXML or .drt timelines (OTIO can't draw it)")
     return out
 
 
@@ -601,6 +606,11 @@ def cmd_media(c, ins, outs):
             "-map", "0:v:0", "-map", "0:a:0?", *c.streamer["media"]["ffmpeg_args"], outs["media"]]
 
 
+def after_media(c, ins, outs, rec):
+    # Read by drt_skip, which runs on every UI refresh and must not shell out to ffprobe.
+    rec["fps"] = ffprobe(c.tools, outs["media"])["fps"]
+
+
 def check_media(c, ins, outs):
     m, v = ffprobe(c.tools, outs["media"]), ffprobe(c.tools, ins["video"])
     if abs(m["duration"] - v["duration"]) > 1.5:
@@ -753,6 +763,64 @@ def check_timeline(c, ins, outs):
     return None
 
 
+def drt_outputs(m):
+    """One .drt per ticked layout, only when "drt" is ticked
+    (docs/design-notes.md#animated-captions-via-drt)."""
+    if "drt" not in project_options(m):
+        return {}
+    return {n: "timeline_%s_v{v}.drt" % n for n in m.get("layouts", ["normal"])}
+
+
+DRT_TEMPLATES = os.path.join(ROOT, "templates", "drt")
+DRT_FPS = 60.0   # make_drt.TEMPLATE_FPS: the shipped templates are 60 fps Resolve exports
+
+
+def p_drt(c):
+    lays = profile_layouts(c.streamer)
+    out = {"layouts": c.layouts, "layout_cfg": {n: lays.get(n) for n in c.layouts},
+           "script_fp": fingerprint(script("make_drt.py")),
+           "format_fp": fingerprint(script("drt_format.py")),
+           "templates": {f: fingerprint(os.path.join(DRT_TEMPLATES, f))
+                         for f in sorted(os.listdir(DRT_TEMPLATES)) if f.endswith(".drt")}}
+    if "drt" not in c.options:
+        out["off"] = True        # only when off: ticking it back on doesn't churn
+    return out
+
+
+def drt_skip(c):
+    if "drt" not in c.options:
+        return "animated captions (.drt) not ticked"
+    fps = c.m["stages"].get("media", {}).get("fps")  # None on projects from before: let make_drt decide
+    if fps and abs(fps - DRT_FPS) > 0.01:
+        return "media is %g fps; the .drt templates are %g fps timelines -- use the FCPXML" % (fps, DRT_FPS)
+    return None
+
+
+def cmd_drt(c, ins, outs):
+    cmd = [PY, script("make_drt.py"), "--cutlist", ins["cutlist"], "--media", ins["media"],
+           "--profile", c.streamer_path, "--words", ins["words"], "--name", os.path.basename(c.pdir),
+           "--ffprobe", c.tools["ffprobe"]]
+    for n in c.layouts:
+        if n in outs:
+            cmd += ["--layout", "%s=%s" % (n, outs[n])]
+    if ins.get("webcam"):
+        cmd += ["--webcam", ins["webcam"]]
+    return cmd
+
+
+def check_drt(c, ins, outs):
+    import zipfile
+    for n in [x for x in c.layouts if x in outs]:
+        try:
+            with zipfile.ZipFile(outs[n]) as z:
+                names = z.namelist()
+        except zipfile.BadZipFile:
+            return "%s is not a .drt (zip) file" % os.path.basename(outs[n])
+        if "project.xml" not in names or not any(x.startswith("SeqContainer/") for x in names):
+            return "%s has no timeline in it" % os.path.basename(outs[n])
+    return None
+
+
 STAGES = [
     dict(name="download", routes=("vod",), inputs={}, outputs={"video": "clip_v{v}.mp4"},
          params=p_download, cmd=cmd_download,
@@ -778,7 +846,8 @@ STAGES = [
          params=p_review, cmd=cmd_review, check=check_review, after=after_review,
          est_time=0.005, est_bytes=200),
     dict(name="media", inputs={"video": ("@video", "video")}, outputs={"media": "clip_edit_v{v}.mov"},
-         params=p_media, cmd=cmd_media, check=check_media, est_time=0.3, est_bytes=1.34e6),
+         params=p_media, cmd=cmd_media, check=check_media, after=after_media,
+         est_time=0.3, est_bytes=1.34e6),
     dict(name="signals", routes=("vod",), inputs={"audio": ("audio", "audio"),
                                                   "transcript": ("review", "transcript")},
          outputs={"signals": "audio_signals_v{v}.json"}, params=p_signals, cmd=cmd_signals,
@@ -801,6 +870,10 @@ STAGES = [
                                   "graphics": ("icons?", "graphics")},
          outputs=timeline_outputs, params=p_timeline, cmd=cmd_timeline,
          check=check_timeline, est_time=0.001, est_bytes=0),
+    dict(name="drt", inputs={"cutlist": ("@cutlist", "cutlist"), "media": ("media", "media"),
+                             "words": ("review", "transcript"), "webcam": ("webcam?", "webcam")},
+         outputs=drt_outputs, params=p_drt, cmd=cmd_drt, skip=drt_skip,
+         check=check_drt, est_time=0.002, est_bytes=0),
 ]
 STAGE = {s["name"]: s for s in STAGES}
 
@@ -810,6 +883,10 @@ def deliverables(m):
     st = m["stages"]
     out = []
     tl = st.get("timeline", {}).get("outputs", {})
+    drt = st.get("drt", {}).get("outputs", {}) if st.get("drt", {}).get("status") == "done" else {}
+    for n in m.get("layouts", ["normal"]):
+        if n in drt:
+            out.append(("drt_" + n, "Animated captions timeline -- %s (.drt)" % n, drt[n]))
     for n in m.get("layouts", ["normal"]):
         if n in tl:
             out.append((n, "Timeline -- %s" % n, tl[n]))

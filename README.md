@@ -250,6 +250,7 @@ is always safe.
 | `webcam` | cut out the webcam for vertical layouts | `webcam_v1.mov` |
 | `icons` | place images where trigger words occur | `graphics_v1.json` |
 | `timeline` | write the interchange files | `timeline_*.fcpxml`, `.otio` |
+| `drt` | Resolve's own timeline format, with animated captions | `timeline_*.drt` |
 
 Guarantees worth knowing: a stage counts as done only once its output passes a check;
 interrupted attempts are cleaned up rather than left to look finished; staleness is
@@ -273,6 +274,22 @@ A run is a **streamer profile × game pack**.
   profile.
 
 
+### What a run makes
+
+Everything except download → review is optional, ticked per run (or per streamer as
+`default_options`), on the New run form or with `src/run_pipeline.py choose`:
+
+| Option | Gives you |
+|---|---|
+| `drt` | Resolve's own timeline per layout, captions as word chunks that pop in — **60 fps media only** |
+| `fcpxml` | one FCPXML timeline per layout; required for the Short layout |
+| `otio` | the older timeline format, Normal layout only |
+| `srt` | a subtitle file to drag onto the Normal timeline |
+| `icons` | images on trigger words, when the game pack has an icon map |
+
+At least one timeline format must be ticked. A Short (stacked) layout needs `fcpxml` or
+`drt` — OTIO cannot express it.
+
 ### Whisper.cpp settings
 
 **Always set `whisper.language` explicitly.** whisper.cpp's `-l` defaults to `en`, not
@@ -290,8 +307,16 @@ Stated plainly so nobody files an issue for something already known:
   often than a model-corrected transcript would. The Review screen is how you fix them, by
   ear, a word at a time. An LLM correction stage existed until v0.2.0 and was removed
   because it made a paid CLI a hard dependency of every run.
-- **The DRT writer is not wired into the orchestrator.** Animated captions work and are
-  probe-validated, but you run `src/make_drt.py` by hand. This is the next piece of work.
+- **Animated captions (`.drt`) need 60 fps media.** The `.drt` templates are real Resolve
+  21.1.1 exports — the format is undocumented, so every timeline is built from a known-good
+  one rather than from nothing — and those exports are 60 fps timelines. On any other frame
+  rate the `drt` stage skips with a message and the FCPXML timeline covers you. The
+  quickstart's `samples/jfk.mp4` is 30 fps, so it skips there: that is expected, not a
+  failure. To use it, export your own template at your frame rate
+  ([templates/drt/README.md](templates/drt/README.md)).
+- **The `.drt` timelines carry no icons.** `make_drt.py` has no `--graphics`; `make_fcpxml.py`
+  does. Ticking `drt` and `icons` together gives you icons on the FCPXML timeline and none on
+  the `.drt`.
 - **The rough-cut scorer is the least mature stage.** `cutlist.json` is the pipeline's
   central artifact and the scorer is its only producer. It works; it has not been
   validated across much content.

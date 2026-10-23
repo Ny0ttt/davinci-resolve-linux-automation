@@ -25,6 +25,22 @@ graph. whisper.cpp is an externally installed tool, exactly like `ffmpeg` and
 - Run manifests record the whisper version from `whisper_cli --version` instead of a
   `git rev-parse` against the submodule — it now reports the binary you actually ran.
 
+### Added
+
+- **Animated captions are reachable from a run.** New `drt` option and `drt` stage write
+  Resolve's own timeline format, one `.drt` per ticked layout, with each caption a word chunk
+  that pops in (Zoom 0.89 → 1.21 → 1.0 over 0.2 s). `make_drt.py`, `drt_format.py` and the
+  templates shipped from the start, but nothing called them, so `.drt` was unreachable without
+  running the script by hand. On by default; a finished `.drt` is listed as a deliverable.
+- `.drt` needs **60 fps** media, because the templates are 60 fps Resolve exports. On any other
+  rate the stage skips with `media is N fps; the .drt templates are 60 fps timelines -- use the
+  FCPXML` and the FCPXML timeline covers it. The 30 fps quickstart sample skips, by design.
+- A Short (stacked) layout is now satisfied by `fcpxml` **or** `drt`, not `fcpxml` alone.
+- The `media` stage records the media frame rate in the project file, so the frame-rate check
+  costs nothing on a UI refresh.
+- `DEFAULT_OPTIONS` is spelled out rather than derived from `OPTIONS`, so adding an option is a
+  deliberate decision about existing projects instead of an automatic one.
+
 ### Fixed
 
 - **The UI could not start a run.** The `src/` restructure left `ui_server.PIPELINE` built from

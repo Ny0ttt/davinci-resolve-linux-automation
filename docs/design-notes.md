@@ -68,8 +68,14 @@ generated from nothing, so the surrounding structure is known-good.
 The caption animation itself is a scale pop — Zoom 0.89 → 1.21 → 1.0 over 0.2 s at each
 caption's start.
 
-**Status:** the DRT writer is probe-validated but **not yet wired into the
-orchestrator**. See the README's status section.
+**Status:** wired in as the `drt` run option. The import probe passed in free Resolve
+21.1.1 on 2026-10-17 — all three probe files, word-chunk pop accepted. The writer and its
+templates shipped from the start; the orchestrator stage was ported in on 2026-10-23.
+
+The templates are 60 fps exports, so `drt_skip` skips the stage on any other frame rate and
+points at the FCPXML instead. Patching the rate into the template at write time is possible
+— it is a hex-encoded little-endian double in the sequence XML — but untried, and Resolve may
+not accept a rate its own export did not carry.
 
 ---
 
