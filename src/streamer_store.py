@@ -17,7 +17,7 @@ import run_pipeline as rp
 
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,40}$")
 LOGIN_RE = re.compile(r"^[A-Za-z0-9_]{2,25}$")
-LANG_RE = re.compile(r"^[a-z]{2,3}$")
+LANG_RE = re.compile(r"^(auto|[a-z]{2,3})$")
 
 SHORT_DEFAULT = {"title": "Vertical Short (webcam top)", "kind": "stack", "size": [1080, 1920],
                  "webcam": {"track": 1, "zoom": 1.0, "x": 0.0, "y": 0.0},
@@ -68,8 +68,8 @@ def build(form, existing=None):
     prof["twitch_logins"] = list(dict.fromkeys(x.lower() for x in logins))
     lang = form.get("language")
     if not isinstance(lang, str) or not LANG_RE.match(lang):
-        raise ProfileError("language: a whisper code like ms, en, id (never empty -- whisper would "
-                           "translate into English)")
+        raise ProfileError("language: a whisper code like ms, en, id, or auto (never empty -- whisper "
+                           "would translate into English)")
     prof.setdefault("whisper", {})["language"] = lang
 
     cam = form.get("webcam")

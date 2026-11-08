@@ -40,6 +40,11 @@ graph. whisper.cpp is an externally installed tool, exactly like `ffmpeg` and
   costs nothing on a UI refresh.
 - `DEFAULT_OPTIONS` is spelled out rather than derived from `OPTIONS`, so adding an option is a
   deliberate decision about existing projects instead of an automatic one.
+- **The example profile auto-detects the language instead of assuming English.** With `en`,
+  a first run on any non-English stream came out as an English translation. `auto` is now a
+  valid profile language (also in the UI's Streamers form). whisper guesses one language
+  from the clip's opening, so the transcribe stage records what it heard and how sure it was,
+  and the project page shows it (*heard: Malay 96%*), marked when whisper was unsure (p < 0.5).
 
 ### Fixed
 

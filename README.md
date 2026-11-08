@@ -165,7 +165,7 @@ cp games/example.json     games/mygame.json
 ```
 
 The comments in each file explain every field; the two that matter most are `whisper.language`
-(**always set it explicitly** — see below) and `webcam.box`.
+(**set it to the streamer's main language** — see below) and `webcam.box`.
 
 > Once more than one streamer profile exists, the clip route can no longer guess — pass
 > `--streamer <name>` on every run.
@@ -292,9 +292,16 @@ At least one timeline format must be ticked. A Short (stacked) layout needs `fcp
 
 ### Whisper.cpp settings
 
-**Always set `whisper.language` explicitly.** whisper.cpp's `-l` defaults to `en`, not
+**Never leave `whisper.language` out.** whisper.cpp's `-l` defaults to `en`, not
 auto-detect — on non-English speech it produces a fluent English *translation* instead
 of a transcript, with no warning and output that looks entirely plausible. Example script are in Malay Language.
+
+The example profile uses `auto`, so a first run works whatever the streamer speaks. whisper
+guesses **one** language from the clip's opening and keeps it for the whole clip, so a clip
+that opens on a different language than the rest can still come out translated. The project
+page shows what whisper heard (e.g. *heard: Malay 93%*) and marks it when whisper was unsure.
+For a streamer you know, set their main language (`ms`, `id`, …) — English mixed into it is
+kept as English.
 
 ---
 

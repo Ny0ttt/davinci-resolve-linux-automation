@@ -7,9 +7,9 @@
 
   "whisper": {
     "model": "whisper.cpp/models/ggml-medium.bin",
-    "language": "en",
+    "language": "auto",
     "args": ["-ml", "1", "-sow", "-nfa", "--dtw", "medium", "-ojf"],
-    "_language_note": "ALWAYS set this explicitly. whisper.cpp's -l defaults to 'en', NOT auto-detect -- leaving it off on non-English speech makes whisper silently TRANSLATE to English instead of transcribing. Use the ISO code of the spoken language ('ms' Malay, 'id' Indonesian, 'es' Spanish...). Code-switched English words still come through as English.",
+    "_language_note": "Never leave this out: whisper.cpp's -l defaults to 'en', NOT auto-detect, and on non-English speech that makes whisper silently TRANSLATE to English instead of transcribing. 'auto' (this example's default) lets whisper guess, but it guesses ONE language from the clip's opening and uses it for the whole clip -- a Malay stream that opens on English can come out translated. The project page shows what it heard and warns when it was unsure. For a streamer you know, set the main spoken language instead ('ms' Malay, 'id' Indonesian, 'es' Spanish...); English mixed into it still comes through as English.",
     "_args_note": "-ml 1 -sow => one word per transcript entry, which make_captions.py and apply_edits.py both require. --dtw <preset> gives per-word timing for the align stage and the preset MUST match the model. DTW is silently disabled when flash attention is on, hence -nfa. -ojf keeps per-token t_dtw in the JSON."
   },
 

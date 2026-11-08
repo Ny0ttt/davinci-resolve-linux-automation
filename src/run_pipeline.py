@@ -465,6 +465,20 @@ def cmd_transcribe(c, ins, outs):
             *w["args"], "-oj", "-f", ins["audio"], "-of", outs["transcript"][:-len(".json")]]
 
 
+LANG_LINE = re.compile(r"auto-detected language: (\w+) \(p = ([\d.]+)\)")
+LANG_UNSURE = 0.5    # below this, the UI warns: one window of a Malay clip scored 0.12
+
+
+def after_transcribe(c, ins, outs, rec):
+    # Shown on the project page. With -l auto, whisper picks ONE language from the clip's
+    # opening; a wrong pick translates the whole clip into it, so the pick must be visible.
+    rec["language"] = load_json(outs["transcript"]).get("result", {}).get("language")
+    if c.streamer["whisper"]["language"] == "auto":
+        with open(c.path(rec["log"]), encoding="utf-8", errors="replace") as f:
+            hit = LANG_LINE.search(f.read())
+        rec["language_p"] = round(float(hit.group(2)), 3) if hit else None
+
+
 def words_in(path):
     return [e for e in load_json(path).get("transcription", []) if e.get("text", "").strip()]
 
@@ -833,7 +847,8 @@ STAGES = [
          params=lambda c: {}, cmd=cmd_audio, check=check_audio, est_time=0.01, est_bytes=32e3),
     dict(name="transcribe", inputs={"audio": ("audio", "audio")},
          outputs={"transcript": "transcript_v{v}.json"}, params=p_transcribe,
-         cmd=cmd_transcribe, check=check_transcript, est_time=3.2, est_bytes=150),
+         cmd=cmd_transcribe, check=check_transcript, after=after_transcribe,
+         est_time=3.2, est_bytes=150),
     # Word times that follow the voice (docs/design-notes.md#animated-captions-via-drt step 0).
     # review applies the reviewer's edits to the aligned transcript -> SRT, captions and
     # signals all get the voice-following timing.

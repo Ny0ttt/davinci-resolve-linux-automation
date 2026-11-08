@@ -141,7 +141,8 @@ def project_view(name):
         stages.append({"name": n, "state": s, "reason": reason, "version": rec.get("version"),
                        "outputs": list((rec.get("outputs") or {}).values()) if s != "waiting" else [],
                        "seconds": rec.get("seconds"), "started": rec.get("started"),
-                       "cost_usd": rec.get("cost_usd")})
+                       "cost_usd": rec.get("cost_usd"), "language": rec.get("language"),
+                       "language_p": rec.get("language_p")})
         if s in ("running", "failed", "interrupted") and not focus:
             focus = n
     log_stage = focus or next((x["name"] for x in reversed(stages) if x["state"] == "done"), None)

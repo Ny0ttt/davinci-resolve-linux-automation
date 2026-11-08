@@ -124,9 +124,15 @@ auto-detect.** whisper.cpp assumes English, and on non-English speech it will pr
 fluent English *translation* rather than a transcript — with no warning, and output
 that looks perfectly plausible.
 
-Always set the language explicitly in the streamer profile. Setting it correctly also
+Always set the language in the streamer profile. Setting it correctly also
 ran **3 minutes faster** than the wrong run on the same clip, and preserved
 code-switched English terms as English.
+
+`-l auto` is a real option and the example profile's default, but it detects **once**, from
+the first 30 s, and keeps that language for the whole clip. On a 3-minute Malay/English
+clip, ten of eleven 30 s windows detected `ms` at p ≥ 0.81 — the eleventh, an English-heavy
+stretch, still said `ms` but at **p = 0.12**. A clip starting there could have gone English.
+The transcribe stage records the detected language and p, and the UI flags p < 0.5.
 
 ### Word timing needs DTW, and DTW needs flash attention off
 

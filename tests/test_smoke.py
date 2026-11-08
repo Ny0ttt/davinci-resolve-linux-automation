@@ -466,3 +466,38 @@ def test_a_finished_drt_is_offered_as_a_deliverable():
     m["stages"]["drt"] = {"status": "skipped"}
     assert "drt_normal" not in [r for r, _, _ in rp.deliverables(m)], \
         "a skipped .drt must not be offered"
+
+
+# ---------------------------------------------------------------- transcription language
+
+def test_example_profile_does_not_default_to_english():
+    """Regression: example.json said `en`, so the first run on any non-English stream came
+    out as a fluent English translation. `auto` must also pass the UI's profile form."""
+    import streamer_store
+
+    lang = json.loads(read("streamers/example.json"))["whisper"]["language"]
+    assert lang == "auto", "example profile language is %r" % lang
+    assert streamer_store.LANG_RE.match("auto")
+
+
+def test_transcribe_records_what_whisper_heard(tmp_path):
+    """With -l auto a wrong guess translates the whole clip, so the project page must be
+    able to show the guess and how sure whisper was."""
+    import run_pipeline as rp
+
+    assert rp.STAGE["transcribe"].get("after") is rp.after_transcribe
+    (tmp_path / "t.json").write_text(json.dumps({"result": {"language": "ms"}, "transcription": []}))
+    (tmp_path / "t.log").write_text("whisper_full_with_state: auto-detected language: ms (p = 0.945081)\n")
+
+    class C:
+        streamer = {"whisper": {"language": "auto"}}
+        path = staticmethod(lambda f: str(tmp_path / f))
+
+    rec = {"log": "t.log"}
+    rp.after_transcribe(C, {}, {"transcript": str(tmp_path / "t.json")}, rec)
+    assert rec == {"log": "t.log", "language": "ms", "language_p": 0.945}
+
+    C.streamer = {"whisper": {"language": "ms"}}      # pinned: no guess, so no confidence
+    rec = {"log": "t.log"}
+    rp.after_transcribe(C, {}, {"transcript": str(tmp_path / "t.json")}, rec)
+    assert rec == {"log": "t.log", "language": "ms"}

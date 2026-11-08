@@ -133,6 +133,7 @@ video { width: 100%; border-radius: 8px; background: #000; display: block; }
 .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 0 8px; border-radius: 999px;
   border: 1px solid currentColor; }
 .tag.ok { color: var(--ok); }
+.tag.warn { color: var(--warn); }
 .layouts { display: flex; flex-wrap: wrap; gap: 6px 4px; }
 
 /* streamer form: frame + webcam box */

@@ -339,6 +339,7 @@ async function viewProject(id, name) {
       h("span", {class: "mono small"}, x.outputs.join(", ")),
       h("span", {class: "small muted"}, x.state === "running" ? "running " + since(x.started)
         : [dur(x.seconds), x.cost_usd ? " · ~$" + x.cost_usd.toFixed(2) : ""].join("")),
+      heardTag(x),
       x.reason ? h("span", {class: "reason"}, (x.state === "failed" ? "→ " : "") + x.reason) : null)));
 
     let done = null;
@@ -658,7 +659,18 @@ async function viewStreamers(id) {
 
 const LANGS = [["ms", "Malay (+ English code-switching)"], ["en", "English"], ["id", "Indonesian"], ["tl", "Filipino"],
   ["th", "Thai"], ["vi", "Vietnamese"], ["zh", "Chinese"], ["ja", "Japanese"], ["ko", "Korean"], ["es", "Spanish"],
-  ["pt", "Portuguese"], ["ar", "Arabic"], ["hi", "Hindi"], ["ta", "Tamil"]];
+  ["pt", "Portuguese"], ["ar", "Arabic"], ["hi", "Hindi"], ["ta", "Tamil"],
+  ["auto", "Auto-detect (one language per clip, guessed from its start)"]];
+const LANG_UNSURE = 0.5;   // run_pipeline.LANG_UNSURE
+
+function heardTag(x) {
+  if (!x.language) return null;
+  const name = (LANGS.find(l => l[0] === x.language) || [0, x.language])[1].split(" (")[0];
+  const unsure = x.language_p != null && x.language_p < LANG_UNSURE;
+  return h("span", {class: "tag" + (unsure ? " warn" : ""),
+    title: unsure ? "whisper was unsure which language this is. If it's wrong, set the streamer's language and rebuild from transcribe." : ""},
+    "heard: " + name + (x.language_p != null ? " " + Math.round(x.language_p * 100) + "%" : ""));
+}
 
 async function viewStreamerForm(id, editName, q) {
   document.title = (editName ? "Edit " + editName : "New streamer") + " · Video Pipeline";
