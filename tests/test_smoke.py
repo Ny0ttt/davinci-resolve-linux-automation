@@ -23,6 +23,8 @@ Each test below corresponds to a defect that actually shipped:
                                           called them, so .drt was unreachable from a run
   - drt_skip with no fps recorded      -- the guard reads stages.media.fps, so the media
                                           stage has to write it or the guard never fires
+  - a broken symlink out of the repo   -- shipped a private absolute path, and the
+                                          privacy scan skipped it as "not a file"
 """
 
 import importlib
@@ -71,7 +73,7 @@ def shipped(*patterns):
                          capture_output=True, text=True, check=True).stdout
     return [p for p in out.splitlines()
             if p and not p.startswith(("venv/", "whisper.cpp/", "projects/"))
-            and os.path.isfile(repo(p))]
+            and (os.path.isfile(repo(p)) or os.path.islink(repo(p)))]
 
 
 def has_cli(name):
@@ -297,7 +299,14 @@ PRIVATE = ["fixzplays", "ea_fc", "gameplay_commentary_malay", "2898820098", "Car
 def test_no_private_data(term):
     hits = []
     for path in shipped():
-        if not path or path == SELF or not os.path.isfile(repo(path)):
+        if not path or path == SELF:
+            continue
+        if os.path.islink(repo(path)):
+            # A link ships its target string, and a broken one fails isfile() below.
+            if term.lower() in os.readlink(repo(path)).lower():
+                hits.append(path)
+            continue
+        if not os.path.isfile(repo(path)):
             continue
         try:
             blob = read(path)
@@ -306,6 +315,18 @@ def test_no_private_data(term):
         if term.lower() in blob.lower():
             hits.append(path)
     assert not hits, "%r appears in: %s" % (term, ", ".join(hits))
+
+
+def test_no_symlink_leaves_the_repo():
+    """Regression: a stray `ggml-` link into the private lab's whisper.cpp shipped in the
+    first push. It was broken in every clone, so the isfile() scan above never saw it."""
+    bad = []
+    for path in shipped():
+        if path and os.path.islink(repo(path)):
+            target = os.path.realpath(repo(path))
+            if not target.startswith(ROOT + os.sep):
+                bad.append("%s -> %s" % (path, os.readlink(repo(path))))
+    assert not bad, "symlinks out of the repo: %s" % ", ".join(bad)
 
 
 # ---------------------------------------------------------------- dependencies
